@@ -1,6 +1,6 @@
 USTH Machine Learning in Medicine 2026
 ==================================
 
-* Your name here
-* Your ID here
-* Your team ID here
+* Nguyen Quoc Viet
+* 23BI14451
+* 10
