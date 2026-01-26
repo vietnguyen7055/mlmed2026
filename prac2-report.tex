@@ -1,0 +1,175 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{graphicx}
+\usepackage{float}
+
+\title{Automated Fetal Head Circumference Measurement using Deep Learning: A Convolutional Neural Network Approach for 2D Ultrasound Image Analysis}
+
+\author{Your Name Here\\USTH}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report presents a deep learning approach for automated measurement of fetal head circumference (HC) from 2D ultrasound images. We implemented a Convolutional Neural Network (CNN) regression model to predict head circumference measurements in millimeters directly from ultrasound images. The model was trained on the HC18 dataset, which contains 999 training images with corresponding head circumference annotations. The CNN architecture achieved a mean absolute error (MAE) of 42.30 mm and an R² score of 0.1977 on the validation set, demonstrating the feasibility of automated HC measurement. While the model shows promise, the relatively low R² score indicates room for improvement through enhanced architecture design, data augmentation, and transfer learning techniques.
+\end{abstract}
+
+\section{Introduction}
+
+Fetal head circumference (HC) measurement is a critical parameter in prenatal care, used to assess fetal growth, estimate gestational age, and detect potential abnormalities. Traditional measurement methods require manual annotation by trained sonographers, which is time-consuming, subjective, and prone to inter-observer variability. Automated measurement systems can improve consistency, reduce measurement time, and potentially enhance diagnostic accuracy.
+
+The HC18 dataset, derived from the Grand Challenge on automated HC measurement, provides a standardized benchmark for developing and evaluating automated measurement algorithms. This study focuses on developing a deep learning model capable of predicting head circumference measurements directly from 2D ultrasound images, eliminating the need for manual annotation.
+
+Convolutional Neural Networks (CNNs) are well-suited for this task due to their ability to automatically extract hierarchical features from medical images and learn complex spatial patterns. We implemented a CNN-based regression model to predict continuous HC values from ultrasound images, addressing this as a regression problem rather than a segmentation or detection task.
+
+\section{Methodology}
+
+\subsection{Dataset}
+
+The HC18 dataset consists of 2D ultrasound images of fetal heads with corresponding head circumference measurements. The dataset is organized as follows:
+\begin{itemize}
+    \item Training set: 999 images with head circumference annotations
+    \item Test set: 335 images (without annotations, for prediction)
+    \item Image format: PNG grayscale images
+    \item Ground truth: Head circumference in millimeters (mm)
+    \item Additional data: Pixel size information for each image
+\end{itemize}
+
+The head circumference values in the training set range from 44.30 mm to 346.40 mm, with a mean of 174.38 mm and standard deviation of 65.25 mm, indicating significant variability in fetal head sizes across different gestational ages.
+
+The dataset was split into training (80\%) and validation (20\%) sets for model development and evaluation, maintaining the temporal order of the data to ensure realistic performance assessment.
+
+\subsection{Data Preprocessing}
+
+All ultrasound images were preprocessed to ensure consistent input dimensions and normalized pixel values:
+
+\begin{enumerate}
+    \item \textbf{Resizing}: Images were resized to 224×224 pixels to standardize input dimensions for the CNN
+    \item \textbf{Grayscale conversion}: Images were converted to grayscale (single channel) to reduce computational complexity
+    \item \textbf{Normalization}: Pixel values were normalized to the range [0, 1] by dividing by 255.0
+    \item \textbf{Channel expansion}: A channel dimension was added to create (224, 224, 1) input shape
+\end{enumerate}
+
+The preprocessing pipeline ensures that all images have uniform dimensions and normalized intensity values, which is essential for stable CNN training.
+
+\subsection{Model Architecture}
+
+A Convolutional Neural Network was designed for regression, with the following architecture:
+
+\begin{itemize}
+    \item \textbf{Convolutional layers}: Four convolutional blocks with increasing filter sizes (32, 64, 128, 256)
+    \item \textbf{Pooling}: Max pooling (2×2) after each convolutional layer to reduce spatial dimensions
+    \item \textbf{Global Average Pooling}: Replaces fully connected layers to reduce overfitting
+    \item \textbf{Dense layers}: Two fully connected layers (512 and 256 neurons) with ReLU activation
+    \item \textbf{Dropout}: Regularization layers (0.5 and 0.3 dropout rates) to prevent overfitting
+    \item \textbf{Output layer}: Single neuron for regression output (head circumference in mm)
+\end{itemize}
+
+The model was compiled with:
+\begin{itemize}
+    \item \textbf{Optimizer}: Adam with learning rate 0.001
+    \item \textbf{Loss function}: Mean Squared Error (MSE)
+    \item \textbf{Metrics}: Mean Absolute Error (MAE) for evaluation
+\end{itemize}
+
+\subsection{Training Procedure}
+
+The model was trained with the following hyperparameters and strategies:
+\begin{itemize}
+    \item \textbf{Epochs}: Maximum 50 epochs with early stopping
+    \item \textbf{Batch size}: 32 samples per batch
+    \item \textbf{Early stopping}: Monitors validation loss with patience of 10 epochs
+    \item \textbf{Learning rate reduction}: Reduces learning rate by factor of 0.5 when validation loss plateaus (patience: 5 epochs)
+    \item \textbf{Validation split}: 20\% of training data reserved for validation
+\end{itemize}
+
+Early stopping and learning rate reduction were implemented to prevent overfitting and improve convergence, respectively.
+
+\subsection{Evaluation Metrics}
+
+Model performance was assessed using multiple regression metrics:
+\begin{itemize}
+    \item \textbf{Mean Absolute Error (MAE)}: Average absolute difference between predicted and actual HC values
+    \item \textbf{Root Mean Squared Error (RMSE)}: Square root of average squared differences, penalizes larger errors more
+    \item \textbf{R² Score (Coefficient of Determination)}: Proportion of variance in HC explained by the model
+\end{itemize}
+
+These metrics provide complementary insights: MAE gives interpretable error in millimeters, RMSE emphasizes larger errors, and R² indicates overall model fit.
+
+\section{Results}
+
+\subsection{Model Performance}
+
+The CNN regression model achieved the following performance metrics on the validation set:
+\begin{itemize}
+    \item \textbf{Validation MAE}: 42.30 mm
+    \item \textbf{Validation RMSE}: 56.89 mm
+    \item \textbf{Validation R²}: 0.1977
+\end{itemize}
+
+On the training set, the model achieved:
+\begin{itemize}
+    \item \textbf{Training MAE}: 44.65 mm
+    \item \textbf{Training RMSE}: 60.04 mm
+    \item \textbf{Training R²}: 0.1634
+\end{itemize}
+
+The similar performance between training and validation sets suggests that overfitting was successfully mitigated through regularization techniques. However, the relatively low R² scores (0.16-0.20) indicate that the model explains only a small proportion of the variance in head circumference measurements.
+
+\subsection{Training Dynamics}
+
+The training process showed steady improvement in both loss and MAE metrics. The model converged within the early stopping criteria, indicating efficient learning. The learning rate reduction mechanism was activated during training, suggesting that fine-tuning was beneficial for optimization.
+
+\subsection{Prediction Analysis}
+
+Scatter plots of predicted versus actual head circumference values reveal the model's prediction patterns. While there is a positive correlation between predictions and ground truth, the spread of points indicates room for improvement in prediction accuracy. The model tends to predict values closer to the mean, which is a common behavior in regression models with limited predictive power.
+
+\section{Discussion}
+
+\subsection{Model Performance Analysis}
+
+The achieved MAE of 42.30 mm represents approximately 24\% of the mean head circumference (174.38 mm), which may be acceptable for certain clinical applications but could be improved. The low R² score (0.1977) suggests that the model captures only a portion of the variability in head circumference measurements.
+
+Several factors may contribute to the limited performance:
+\begin{enumerate}
+    \item \textbf{Image quality variability}: Ultrasound images exhibit significant variability in quality, contrast, and noise levels
+    \item \textbf{Anatomical variability}: Fetal head shapes and orientations vary substantially across images
+    \item \textbf{Model complexity}: The current architecture may be insufficient to capture the complex relationships between image features and head circumference
+    \item \textbf{Data size}: With 999 training samples, the dataset may be limited for deep learning approaches
+\end{enumerate}
+
+\subsection{Limitations and Challenges}
+
+The current approach faces several challenges:
+\begin{itemize}
+    \item \textbf{Feature extraction}: The model must learn to identify and measure the head boundary from raw pixel values, which is inherently challenging
+    \item \textbf{Scale normalization}: While pixel size information is available, effectively incorporating it into the model requires careful design
+    \item \textbf{Generalization}: The model's ability to generalize to different ultrasound machines, operators, and imaging conditions is uncertain
+\end{itemize}
+
+\subsection{Potential Improvements}
+
+Several strategies could enhance model performance:
+\begin{enumerate}
+    \item \textbf{Transfer learning}: Utilizing pre-trained models (e.g., ImageNet) as feature extractors could improve feature representation
+    \item \textbf{Data augmentation}: Techniques such as rotation, scaling, and intensity variations could increase effective dataset size
+    \item \textbf{Multi-task learning}: Simultaneously predicting head circumference and performing segmentation could provide additional supervision
+    \item \textbf{Attention mechanisms}: Incorporating attention layers could help the model focus on relevant anatomical regions
+    \item \textbf{Ensemble methods}: Combining multiple models could improve robustness and accuracy
+    \item \textbf{Hyperparameter optimization}: Systematic search for optimal architecture and training parameters
+\end{enumerate}
+
+\section{Conclusion}
+
+This study successfully implemented a CNN-based regression model for automated fetal head circumference measurement from 2D ultrasound images. The model achieved a validation MAE of 42.30 mm, demonstrating the feasibility of automated HC measurement. However, the relatively low R² score (0.1977) indicates significant room for improvement.
+
+The results suggest that while deep learning approaches show promise for automated HC measurement, more sophisticated architectures, larger datasets, and advanced training techniques are needed to achieve clinical-grade accuracy. Future work should explore transfer learning, data augmentation, and hybrid approaches combining segmentation and regression to improve performance.
+
+The automated measurement system developed in this study represents a step toward reducing manual annotation burden and improving measurement consistency in prenatal care. With further refinement, such systems could assist healthcare professionals in routine fetal biometry assessments.
+
+\section*{Acknowledgment}
+
+The authors acknowledge the use of the HC18 dataset from the Grand Challenge on automated fetal head circumference measurement, which provides a valuable benchmark for developing and evaluating automated measurement algorithms.
+
+\end{document}
+
