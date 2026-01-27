@@ -1,5 +1,6 @@
 USTH Machine Learning in Medicine 2026
 ==================================
-Nguyen Quoc Viet
-23BI14451
-10
+- Name: Nguyen Quoc Viet
+- Student ID: 23BI14451
+- Group: 10
+
