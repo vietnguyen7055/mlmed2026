@@ -35,7 +35,7 @@ The HC18 dataset consists of 2D ultrasound images of fetal heads with correspond
     \item Additional data: Pixel size information for each image
 \end{itemize}
 
-The head circumference values in the training set range from 44.30 mm to 346.40 mm, with a mean of 174.38 mm and standard deviation of 65.25 mm, indicating significant variability in fetal head sizes across different gestational ages.
+The head circumference values in the training set range from 44.30 mm to 346.40 mm, with a mean of 174.38 mm and standard deviation of 65.25 mm, indicating significant variability in fetal head sizes across different gestational ages. Figure~\ref{fig:hc18_distribution} illustrates this distribution, while Figure~\ref{fig:hc18_samples} shows representative ultrasound images with annotated ground truth head circumference values.
 
 The dataset was split into training (80\%) and validation (20\%) sets for model development and evaluation, maintaining the temporal order of the data to ensure realistic performance assessment.
 
@@ -118,11 +118,11 @@ The similar performance between training and validation sets suggests that overf
 
 \subsection{Training Dynamics}
 
-The training process showed steady improvement in both loss and MAE metrics. The model converged within the early stopping criteria, indicating efficient learning. The learning rate reduction mechanism was activated during training, suggesting that fine-tuning was beneficial for optimization.
+The training process showed steady improvement in both loss and MAE metrics. The model converged within the early stopping criteria, indicating efficient learning. The learning rate reduction mechanism was activated during training, suggesting that fine-tuning was beneficial for optimization. Figure~\ref{fig:hc18_training_curves} visualizes the evolution of training and validation loss (MSE) and MAE across epochs.
 
 \subsection{Prediction Analysis}
 
-Scatter plots of predicted versus actual head circumference values reveal the model's prediction patterns. While there is a positive correlation between predictions and ground truth, the spread of points indicates room for improvement in prediction accuracy. The model tends to predict values closer to the mean, which is a common behavior in regression models with limited predictive power.
+Scatter plots of predicted versus actual head circumference values reveal the model's prediction patterns. While there is a positive correlation between predictions and ground truth, the spread of points indicates room for improvement in prediction accuracy. The model tends to predict values closer to the mean, which is a common behavior in regression models with limited predictive power. Figure~\ref{fig:hc18_pred_vs_actual} shows these relationships for both the training and validation sets.
 
 \section{Discussion}
 
@@ -167,9 +167,45 @@ The results suggest that while deep learning approaches show promise for automat
 
 The automated measurement system developed in this study represents a step toward reducing manual annotation burden and improving measurement consistency in prenatal care. With further refinement, such systems could assist healthcare professionals in routine fetal biometry assessments.
 
+\section{Visualizations}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{figures/hc18_samples.png}
+\caption{Representative ultrasound images from the HC18 training set, resized to 224$\times$224 pixels. Each image is annotated with the corresponding ground truth head circumference (HC) in millimeters.}
+\label{fig:hc18_samples}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{figures/hc18_hc_distribution.png}
+\caption{Histogram of head circumference values in the HC18 training set, showing the range and frequency of HC measurements across the dataset.}
+\label{fig:hc18_distribution}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{figures/hc18_training_curves.png}
+\caption{Training and validation curves for the CNN model. Left: loss (MSE) over epochs. Right: mean absolute error (MAE) over epochs.}
+\label{fig:hc18_training_curves}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{figures/hc18_pred_vs_actual.png}
+\caption{Scatter plots of predicted versus actual head circumference values. Left: training set predictions. Right: validation set predictions. The red dashed line indicates the ideal identity line where predictions perfectly match ground truth.}
+\label{fig:hc18_pred_vs_actual}
+\end{figure}
+
 \section*{Acknowledgment}
 
 The authors acknowledge the use of the HC18 dataset from the Grand Challenge on automated fetal head circumference measurement, which provides a valuable benchmark for developing and evaluating automated measurement algorithms.
 
 \end{document}
+
+
+
+
+
+
 
