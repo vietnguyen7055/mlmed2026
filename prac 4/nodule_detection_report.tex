@@ -1,0 +1,190 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{parskip}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+\title{Machine Learning--Driven Classification of Pulmonary Nodules from Volumetric CT Patches: A 3D Convolutional Network Study on LUNA16-Style Candidate Data}
+\author{}
+\date{March 2025}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\rule{0.9\textwidth}{0.4pt}
+\end{center}
+
+%=============================================================================
+\section{Project Abstract}
+%=============================================================================
+
+Pulmonary nodule detection in chest CT is a key step in lung cancer screening. We applied a 3D convolutional neural network (NoduleNet3D) to classify fixed-size volumetric patches ($32^3$ voxels) centred on candidate locations as nodule versus non-nodule, using a LUNA16-style pipeline with series-level train--validation--test splits. After loading candidate coordinates and CT volumes from \texttt{.mhd} sources, patches were extracted with a lung window (HU $[-1000, 400]$) and normalised to $[0,1]$. Training was performed on a balanced subset of 1,359 candidates to mitigate class imbalance; validation and test sets retained the original distribution (test set: 42,625 samples, 100 nodules). We trained for 10 epochs with Adam (learning rate $10^{-3}$) and CosineAnnealingLR, using BCEWithLogitsLoss. The model achieved a validation AUC of approximately 0.62 by epoch 10, with training loss decreasing from 0.64 to 0.49, indicating learned discriminative signal on the validation distribution. On the full test set, however, at a decision threshold of 0.5 the model predicted every sample as non-nodule, yielding test ROC-AUC 0.50 (no discrimination) and 0\% sensitivity for nodules. A central finding was the \textbf{train--test distribution mismatch}: training on a balanced subset did not generalise to the heavily imbalanced test set under the default threshold, with likely contributions from limited training size, prior shift, and uncalibrated probabilities. These results support the use of balanced evaluation subsets, full training-set class weighting, and threshold or calibration analysis for deployment. Limitations include the single-dataset design, the small balanced training subset, and the need for external validation and optional test-set subsampling (e.g.\ \texttt{TEST\_MAX\_BATCHES}) to control memory when evaluating on the full candidate set.
+
+\vspace{0.5em}
+\noindent\textbf{Keywords:} pulmonary nodule detection; 3D CNN; LUNA16; chest CT; volumetric patch classification; class imbalance; calibration; sensitivity.
+
+\vspace{1em}
+\begin{center}
+\rule{0.9\textwidth}{0.4pt}
+\end{center}
+
+%=============================================================================
+\section{Introduction and Background}
+%=============================================================================
+
+Pulmonary nodules are focal opacities in the lung that may represent early malignancy. Their detection and characterisation in chest CT are central to lung cancer screening programmes. Computer-aided detection (CAD) systems that operate on volumetric CT data can assist radiologists by proposing candidate locations and classifying them as nodule or non-nodule. The LUNA16 challenge and related benchmarks provide large sets of candidate coordinates with binary labels, derived from nodule annotations and negative samples, enabling supervised learning of patch-based classifiers.
+
+Traditional CAD approaches often use hand-crafted features or 2D slice-based networks. Volumetric (3D) convolutional networks can exploit the full spatial context of a nodule and have been shown to improve discrimination when sufficient data are available. A common pipeline is to extract fixed-size 3D patches centred on each candidate, normalise intensity (e.g.\ with a lung window), and train a binary classifier. Performance is typically reported in terms of sensitivity, specificity, and area under the ROC curve (AUC); in screening contexts, sensitivity is often prioritised to minimise missed nodules.
+
+The objectives of this study were: (1) to implement a 3D CNN pipeline for nodule-versus-non-nodule classification using LUNA16-style candidate lists and CT volumes; (2) to train on a balanced subset under a fixed computational budget and report training and validation metrics; (3) to evaluate on the full test set and on a balanced subset where applicable, and to interpret the discrepancy between validation and test performance; and (4) to document limitations and recommendations for threshold choice, calibration, and data scaling.
+
+%=============================================================================
+\section{Statistical Analysis and Computational Environment}
+%=============================================================================
+
+All data loading, model training, and evaluation were performed in Python using PyTorch (model definition and training loop), SimpleITK (reading \texttt{.mhd}/\texttt{.raw} volumes), pandas and NumPy (data handling), and scikit-learn (metrics: ROC-AUC, precision, recall, F1, confusion matrix). A fixed random seed was used for train--validation--test splits and for any stochastic sampling to ensure reproducibility. \textit{Computational environment:} Training and inference were run on a workstation with CUDA-capable GPU; the same code runs on CPU with increased runtime. Optional limits (e.g.\ \texttt{TEST\_MAX\_BATCHES}) were available to bound memory use when evaluating on the full test set, as the dataset caches loaded CT volumes in RAM.
+
+%=============================================================================
+\section{Computational Pipeline and Algorithmic Design}
+%=============================================================================
+
+The analytical workflow was structured as a \textbf{multi-phase pipeline}: data loading and manifest alignment, patch extraction with coordinate mapping, balanced training subset selection, model training with validation monitoring, and test-set evaluation (full and, where implemented, balanced subset).
+
+\subsection{Data loading and patch extraction}
+
+Candidate tables (\texttt{candidates\_train/val/test.csv}) and a series manifest (\texttt{series\_manifest.csv}) were loaded. Each candidate row provides a \texttt{seriesuid}, world coordinates (\texttt{coordX}, \texttt{coordY}, \texttt{coordZ}), and binary label \texttt{class} (1 = nodule, 0 = non-nodule). For each candidate, the corresponding CT volume was loaded from \texttt{.mhd} (with co-located \texttt{.raw}); world coordinates were converted to voxel indices using the volume origin and spacing. A $32\times32\times32$ patch was cropped around the candidate centre (with boundary handling and padding when needed). Voxel intensities were clipped to the lung window (HU $[-1000, 400]$) and normalised to $[0,1]$. Loaded volumes were cached in memory to avoid repeated disk reads; the cache was cleared before full test-set evaluation to reduce RAM use.
+
+\subsection{Model architecture and training}
+
+The classifier \textbf{NoduleNet3D} comprises three 3D convolutional blocks (Conv3d $\to$ BatchNorm3d $\to$ ReLU $\to$ MaxPool3d), reducing spatial dimensions to $4^3$, followed by adaptive average pooling to a single vector, then a two-layer MLP (128 $\to$ 64 $\to$ 1) with dropout 0.5. Output is a single logit; BCEWithLogitsLoss was used for training. Optimiser: Adam with learning rate $10^{-3}$; scheduler: CosineAnnealingLR over 10 epochs. Training used the \textbf{balanced subset} of the training set (1,359 candidates from \texttt{candidates\_train\_balanced\_subset.csv}) with shuffle; when the full training set is used, class-weighted sampling is applied. Validation was performed at the end of each epoch on the validation loader; validation AUC and loss were recorded.
+
+\subsection{Evaluation protocol}
+
+At test time, the trained model was applied to the test loader without shuffling. Predictions were collected as probabilities (sigmoid of logits); binary predictions were obtained with threshold 0.5. Confusion matrix, precision, recall, F1, and ROC-AUC were computed. Where a balanced test subset was evaluated, the same metrics were reported on that subset to allow interpretable sensitivity and specificity despite the imbalance of the full test set.
+
+%=============================================================================
+\section{Data and Splits}
+%=============================================================================
+
+The dataset was derived from LUNA16-style exports: a series manifest listing CT series (by \texttt{seriesuid}) and paths to \texttt{.mhd} files, and candidate tables with one row per candidate (series, coordinates, label). Splits were by series so that no series appeared in more than one of train, validation, or test. The \textbf{training} set was subsampled to a balanced subset of 1,359 candidates for the reported run. The \textbf{test} set comprised 42,625 candidates (42,525 non-nodules, 100 nodules), i.e.\ a prevalence of approximately 0.23\% for the positive class. This severe imbalance, combined with a default threshold of 0.5, led to the model predicting all test samples as negative in the reported experiment.
+
+%=============================================================================
+\section{Training Results}
+%=============================================================================
+
+Table~\ref{tab:training} reports training loss, validation loss, and validation AUC for each of the 10 epochs. Training loss decreased monotonically from 0.6356 to 0.4886; validation loss fluctuated (final 0.4749) and validation AUC improved from approximately 0.53 to approximately 0.62 by the end of training. Peak validation AUC in the run was 0.6267 (epoch 9). These results indicate that the model learned discriminative structure on the validation distribution and that overfitting was not severe within the 10-epoch budget.
+
+\begin{table}[ht]
+\centering
+\caption{Training and validation metrics by epoch. Val AUC is the area under the ROC curve on the validation set.}
+\label{tab:training}
+\begin{tabular}{@{}cccc@{}}
+\toprule
+Epoch & Train loss & Val loss & Val AUC \\
+\midrule
+1  & 0.6356 & 0.4458 & 0.5347 \\
+2  & 0.5990 & 0.4634 & 0.5897 \\
+3  & 0.5949 & 0.4146 & 0.5867 \\
+4  & 0.5773 & 0.3730 & 0.5855 \\
+5  & 0.5631 & 0.4364 & 0.5901 \\
+6  & 0.5546 & 0.3536 & 0.5526 \\
+7  & 0.5286 & 0.4036 & 0.6120 \\
+8  & 0.5179 & 0.4318 & 0.6071 \\
+9  & 0.4887 & 0.4815 & \textbf{0.6267} \\
+10 & 0.4886 & 0.4749 & \textbf{0.6213} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=============================================================================
+\section{Test Set Evaluation (Full Set)}
+%=============================================================================
+
+The trained model was evaluated on the full test set (42,625 samples) with decision threshold 0.5. Table~\ref{tab:confusion} gives the confusion matrix; Table~\ref{tab:metrics} summarises precision, recall, and F1 for each class. The model predicted \textbf{every} test sample as non-nodule: 42,525 true negatives, 0 true positives, 0 false positives, and 100 false negatives. Thus \textbf{test ROC-AUC} was \textbf{0.5000} (no discrimination), \textbf{sensitivity (recall for nodule)} was \textbf{0.00}, and accuracy was 1.00 only because of the extreme class imbalance.
+
+\begin{table}[ht]
+\centering
+\caption{Confusion matrix on the full test set (threshold 0.5).}
+\label{tab:confusion}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+& Predicted non-nodule & Predicted nodule \\
+\midrule
+True non-nodule & 42,525 & 0 \\
+True nodule     & 100    & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Classification metrics on the full test set (threshold 0.5).}
+\label{tab:metrics}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Metric    & Non-nodule & Nodule \\
+\midrule
+Precision & 1.00 & --- (no positive predictions) \\
+Recall    & 1.00 & \textbf{0.00} \\
+F1-score  & 1.00 & 0.00 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=============================================================================
+\section{Interpretation and Train--Test Mismatch}
+%=============================================================================
+
+Validation AUC ($\sim$0.62) indicates that the model has learned to rank nodule versus non-nodule reasonably well on the validation distribution, which is consistent with the use of a balanced training subset and a validation set that may share similar balance or sampling. The full test set, by contrast, has a nodule prevalence of about 0.23\%. Under a default threshold of 0.5, the model never predicted the positive class; hence test AUC was 0.50 and sensitivity was 0.
+
+Possible causes include: (1) \textbf{prior shift}---the test set has a much lower prevalence than the balanced training subset, so the learned decision boundary (in logit or probability space) may not translate to the test prior without recalibration or threshold adjustment; (2) \textbf{limited training data}---1,359 samples may be insufficient for the model to generalise to the full candidate distribution; (3) \textbf{uncalibrated probabilities}---raw sigmoid outputs may be systematically low for nodules when the model is uncertain, so that no prediction exceeds 0.5. The pipeline (data load, 3D CNN, training loop, evaluation) runs correctly; the discrepancy is therefore attributable to evaluation setup and train--test distribution rather than to implementation error.
+
+%=============================================================================
+\section{Discussion}
+%=============================================================================
+
+\subsection{Summary of findings}
+
+This study implemented a 3D CNN (NoduleNet3D) for binary classification of pulmonary nodule candidates from volumetric CT patches in a LUNA16-style setting. Training on a balanced subset of 1,359 candidates over 10 epochs yielded a validation AUC of approximately 0.62 and decreasing training loss, indicating learned discriminative ability on the validation set. On the full test set (42,625 samples, 100 nodules), the model predicted all samples as non-nodule at threshold 0.5, giving test AUC 0.50 and 0\% sensitivity. The central finding is the \textbf{train--test distribution mismatch}: performance on a balanced validation set does not carry over to the heavily imbalanced test set under the default threshold. The results support reporting metrics on a balanced test subset, using class-weighted training on the full training set, and performing threshold or calibration analysis before deployment.
+
+\subsection{Limitations}
+
+The analysis is based on a single dataset and a single train--validation--test split; \textbf{external validation} was not performed. The \textbf{training subset} was limited to 1,359 balanced candidates; the full training set was not used in the reported run. \textbf{No calibration} (e.g.\ isotonic or Platt) was applied to the model outputs, so predicted probabilities may not reflect empirical event rates on the test distribution. The \textbf{default threshold} 0.5 was used throughout; no sweep over operating points was reported. The test set is highly imbalanced, so accuracy is not informative; sensitivity and AUC (or AUC-PR) on a balanced subset would be more appropriate for comparison. Memory constraints may require limiting the number of test batches (\texttt{TEST\_MAX\_BATCHES}) when evaluating on the full set, which was not applied in the run that produced the reported full-set metrics.
+
+\subsection{Comparison with baseline and recommendations}
+
+No explicit baseline (e.g.\ random or constant predictor) was reported; the validation AUC ($\sim$0.62) versus test AUC (0.50) illustrates that in-distribution validation can be optimistic when the test distribution differs. Recommendations for improvement include: (1) evaluate on a \textbf{balanced test subset} (e.g.\ 2:1 neg:pos) to obtain interpretable sensitivity, specificity, and AUC; (2) train on the \textbf{full training set} with class-weighted sampling to improve generalisation; (3) perform \textbf{threshold sweep} or \textbf{calibration} (e.g.\ isotonic regression on a validation subset) to choose an operating point or to improve probability interpretability; (4) consider \textbf{precision--recall AUC} and sensitivity at several thresholds; (5) add \textbf{3D data augmentation} and, where possible, more training data to improve robustness.
+
+%=============================================================================
+\section{Future Work and Conclusion}
+%=============================================================================
+
+\textbf{Future work} may extend the pipeline in several directions. (1) \textbf{Full training set} with class-weighted or focal loss could be evaluated to improve calibration and test-set sensitivity. (2) \textbf{Post-hoc calibration} (isotonic or Platt) could be applied so that predicted probabilities reflect observed nodule prevalence on a validation or balanced subset. (3) \textbf{Multi-threshold reporting} (e.g.\ sensitivity at 0.2, 0.3, 0.5) and \textbf{AUC-PR} would better characterise performance on imbalanced test sets. (4) \textbf{External validation} on another cohort or another centre would strengthen generalisability claims. (5) Integration with a \textbf{candidate generation} stage (e.g.\ detector or rule-based proposal) would yield an end-to-end CAD pipeline.
+
+\textbf{Conclusion.} This study demonstrated a 3D CNN pipeline for pulmonary nodule versus non-nodule classification on LUNA16-style data. Validation AUC reached approximately 0.62, but on the full imbalanced test set the model predicted all samples as non-nodule at threshold 0.5, yielding test AUC 0.50 and 0\% sensitivity. The train--test distribution mismatch underscores the importance of balanced evaluation, class-weighted training, and threshold or calibration analysis before deployment. With these extensions and external validation, the pipeline could contribute to reproducible benchmarks and to the design of CAD systems for lung nodule detection.
+
+%=============================================================================
+\section{Data and Code Availability}
+%=============================================================================
+
+The analysis used a LUNA16-style dataset comprising a series manifest (\texttt{series\_manifest.csv}) and candidate tables (\texttt{candidates\_train.csv}, \texttt{candidates\_val.csv}, \texttt{candidates\_test.csv}, and \texttt{candidates\_train\_balanced\_subset.csv}) under \texttt{dataset\_export/}. CT volumes were stored as \texttt{.mhd}/\texttt{.raw} in subset directories. The computational pipeline (patch extraction, NoduleNet3D, training and evaluation) was implemented in a Jupyter notebook (\texttt{nodule\_detection.ipynb}). Configuration: \texttt{PATCH\_SIZE=32}, \texttt{BATCH\_SIZE=32}, \texttt{EPOCHS=10}, \texttt{LR=1e-3}, with a fixed random seed for reproducibility. Code and documentation are maintained in the project repository.
+
+%=============================================================================
+\section*{References}
+%=============================================================================
+
+\begin{enumerate}
+\item Armato III, S. G., et al. (2011). The Lung Image Database Consortium (LIDC) and Image Database Resource Initiative (IDRI): A completed reference database of lung nodules on CT scans. \textit{Medical Physics}, 38(2), 915--931.
+\item Setio, A. A. A., et al. (2016). Validation, comparison, and combination of algorithms for automatic detection of pulmonary nodules in computed tomography images: The LUNA16 challenge. \textit{Medical Image Analysis}, 42, 1--13.
+\item Paszke, A., et al. (2019). PyTorch: An imperative style, high-performance deep learning library. \textit{Advances in Neural Information Processing Systems}, 32, 8026--8037.
+\item Pedregosa, F., et al. (2011). Scikit-learn: Machine learning in Python. \textit{Journal of Machine Learning Research}, 12, 2825--2830.
+\end{enumerate}
+
+\end{document}
